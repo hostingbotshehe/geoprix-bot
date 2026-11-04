@@ -21,6 +21,12 @@ A simple Discord bot with `/ping` and a `/webhook-1` command that posts the serv
    npm start
    ```
 
+## Member role
+
+Every new member gets the **Member** role (`MEMBER_ROLE_ID`), and on each startup the bot also gives it to existing members who don't have it yet. Bots are skipped, and members waiting on rules screening get it once they accept.
+
+This needs **Server Members Intent** turned on in the Developer Portal (your app → **Bot** → Privileged Gateway Intents). While it's off, the bot logs a warning and skips the role instead of failing to start.
+
 ## Commands
 
 | Command | What it does |

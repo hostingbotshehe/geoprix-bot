@@ -1,10 +1,12 @@
 require('dotenv').config();
 const {
+  ApplicationFlags,
   ChannelFlags,
   ChannelType,
   Client,
   Events,
   GatewayIntentBits,
+  IntentsBitField,
   InteractionContextType,
   MessageFlags,
   PermissionFlagsBits,
@@ -60,6 +62,9 @@ const CHANNEL_POSTS = {
   ...Object.fromEntries(Object.entries(POSTS).filter(([, p]) => p.forum).map(([key, p]) => [p.forum, key])),
 };
 
+// Role every (non-bot) member gets: on join, and for existing members on startup.
+const MEMBER_ROLE_ID = process.env.MEMBER_ROLE_ID || '1567580680676970637'; // @Member
+
 const { DISCORD_TOKEN, CLIENT_ID, GUILD_ID } = process.env;
 if (!DISCORD_TOKEN || !CLIENT_ID) {
   console.error('Missing DISCORD_TOKEN or CLIENT_ID. Copy .env.example to .env and fill it in.');
@@ -82,8 +87,9 @@ const commands = [
     .setContexts(InteractionContextType.Guild),
 ].map((c) => c.toJSON());
 
+const rest = new REST().setToken(DISCORD_TOKEN);
+
 async function registerCommands() {
-  const rest = new REST().setToken(DISCORD_TOKEN);
   // A guild ID registers instantly to one server; without it, commands go global (can take up to an hour).
   const route = GUILD_ID
     ? Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID)
@@ -94,8 +100,39 @@ async function registerCommands() {
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 
-client.once(Events.ClientReady, (c) => {
+client.once(Events.ClientReady, async (c) => {
   console.log(`Logged in as ${c.user.tag}`);
+  if (client.options.intents.has(GatewayIntentBits.GuildMembers)) await backfillMemberRole();
+});
+
+// ---------- member role ----------
+
+async function giveMemberRole(member) {
+  // Pending = hasn't accepted the server's rules screening yet; they get the role once they do.
+  if (member.user.bot || member.pending || member.roles.cache.has(MEMBER_ROLE_ID)) return false;
+  try {
+    await member.roles.add(MEMBER_ROLE_ID, 'Automatic member role');
+    return true;
+  } catch (err) {
+    console.error(`Couldn't give the member role to ${member.user.tag}:`, err.message);
+    return false;
+  }
+}
+
+async function backfillMemberRole() {
+  for (const guild of client.guilds.cache.values()) {
+    if (GUILD_ID && guild.id !== GUILD_ID) continue;
+    if (!guild.roles.cache.has(MEMBER_ROLE_ID)) continue;
+    const members = await guild.members.fetch();
+    let given = 0;
+    for (const member of members.values()) if (await giveMemberRole(member)) given++;
+    console.log(`Member role: gave it to ${given} existing member(s) in ${guild.name}.`);
+  }
+}
+
+client.on(Events.GuildMemberAdd, (member) => giveMemberRole(member));
+client.on(Events.GuildMemberUpdate, (before, after) => {
+  if (before.pending && !after.pending) giveMemberRole(after);
 });
 
 client.on(Events.InteractionCreate, async (interaction) => {
@@ -185,7 +222,21 @@ async function postToForum(interaction, post) {
   return `<#${threadId}>`;
 }
 
+// Joins are only sent to the bot if "Server Members Intent" is on in the Developer Portal (Bot page).
+// Asking for it while it's off makes Discord refuse the login, so check first.
+async function enableMemberIntentIfAllowed() {
+  const app = await rest.get(Routes.currentApplication());
+  const allowed = ApplicationFlags.GatewayGuildMembers | ApplicationFlags.GatewayGuildMembersLimited;
+  if (app.flags & allowed) {
+    // The intents are frozen, but only read when connecting, so swap them before login.
+    client.options.intents = new IntentsBitField([GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers]).freeze();
+  } else {
+    console.warn('Server Members Intent is off in the Developer Portal, so the member role is NOT being given.');
+  }
+}
+
 registerCommands()
+  .then(enableMemberIntentIfAllowed)
   .then(() => client.login(DISCORD_TOKEN))
   .catch((err) => {
     console.error('Startup failed:', err);
