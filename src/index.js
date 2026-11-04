@@ -11,14 +11,34 @@ const {
   Routes,
   SlashCommandBuilder,
 } = require('discord.js');
-const { buildRulesEmbed } = require('./rules');
-
 const path = require('node:path');
+const { buildRulesEmbed } = require('./rules');
+const { buildInstallationEmbeds } = require('./installation');
 
-const WEBHOOK_NAME = 'GeoPrix Rules';
 // Animated GIFs; regenerate with: python tools/make_banner.py
-const RULES_BANNER = path.join(__dirname, '..', 'assets', 'rules-banner.gif');
-const RULES_DIVIDER = path.join(__dirname, '..', 'assets', 'rules-divider.gif');
+const asset = (name) => ({ attachment: path.join(__dirname, '..', 'assets', name), name });
+const DIVIDER = 'rules-divider.gif';
+
+// What /webhook-1 can post. Each post is: banner GIF, then its embeds, then the gradient divider.
+const POSTS = {
+  rules: {
+    label: 'Rules',
+    webhookName: 'GeoPrix Rules',
+    banner: 'rules-banner.gif',
+    embeds: () => [buildRulesEmbed()],
+  },
+  installation: {
+    label: 'Installation',
+    webhookName: 'GeoPrix Installation',
+    banner: 'installation-banner.gif',
+    embeds: () => buildInstallationEmbeds(),
+  },
+};
+
+// Channels that get a specific post automatically. Anything else gets the rules.
+const CHANNEL_POSTS = {
+  [process.env.INSTALL_CHANNEL_ID || '1567573733063794948']: 'installation', // #moddable-download
+};
 
 const { DISCORD_TOKEN, CLIENT_ID, GUILD_ID } = process.env;
 if (!DISCORD_TOKEN || !CLIENT_ID) {
@@ -30,7 +50,13 @@ const commands = [
   new SlashCommandBuilder().setName('ping').setDescription('Check if the bot is alive'),
   new SlashCommandBuilder()
     .setName('webhook-1')
-    .setDescription('Post the server rules in this channel via a webhook')
+    .setDescription("Post this channel's info message (rules or installation) via a webhook")
+    .addStringOption((o) =>
+      o
+        .setName('post')
+        .setDescription("Post something other than this channel's default")
+        .addChoices(...Object.entries(POSTS).map(([value, p]) => ({ name: p.label, value }))),
+    )
     // Only members with Manage Server see/use it by default (adjustable in Server Settings -> Integrations).
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
     .setContexts(InteractionContextType.Guild),
@@ -65,20 +91,21 @@ client.on(Events.InteractionCreate, async (interaction) => {
   if (interaction.commandName === 'webhook-1') {
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     try {
-      await postRules(interaction);
-      await interaction.editReply('✅ Rules posted.');
+      const key = interaction.options.getString('post') ?? CHANNEL_POSTS[interaction.channelId] ?? 'rules';
+      await postContent(interaction, POSTS[key]);
+      await interaction.editReply(`✅ ${POSTS[key].label} posted.`);
     } catch (err) {
       console.error('webhook-1 failed:', err);
       const msg =
         err.code === 50013
           ? "❌ I'm missing the **Manage Webhooks** permission in this channel. Give my role that permission and try again."
-          : `❌ Couldn't post the rules: ${err.message}`;
+          : `❌ Couldn't post it: ${err.message}`;
       await interaction.editReply(msg);
     }
   }
 });
 
-async function postRules(interaction) {
+async function postContent(interaction, post) {
   const channel = interaction.channel;
   if (!channel || ![ChannelType.GuildText, ChannelType.GuildAnnouncement].includes(channel.type)) {
     throw new Error('use this in a normal text or announcement channel (not a thread, voice chat or forum).');
@@ -86,19 +113,19 @@ async function postRules(interaction) {
 
   // Reuse our webhook if it already exists, so running the command again doesn't create duplicates.
   const hooks = await channel.fetchWebhooks();
-  let hook = hooks.find((h) => h.owner?.id === client.user.id && h.name === WEBHOOK_NAME);
+  let hook = hooks.find((h) => h.owner?.id === client.user.id && h.name === post.webhookName);
   if (!hook) {
     hook = await channel.createWebhook({
-      name: WEBHOOK_NAME,
+      name: post.webhookName,
       avatar: client.user.displayAvatarURL(),
       reason: `/webhook-1 used by ${interaction.user.tag}`,
     });
   }
 
-  // Banner, then the rules, then the gradient divider, as separate messages so they stay in that order.
-  await hook.send({ files: [{ attachment: RULES_BANNER, name: 'rules-banner.gif' }] });
-  await hook.send({ embeds: [buildRulesEmbed()], allowedMentions: { parse: [] } });
-  await hook.send({ files: [{ attachment: RULES_DIVIDER, name: 'rules-divider.gif' }] });
+  // Banner, then the embeds, then the gradient divider, as separate messages so they stay in that order.
+  await hook.send({ files: [asset(post.banner)] });
+  await hook.send({ embeds: post.embeds(), allowedMentions: { parse: [] } });
+  await hook.send({ files: [asset(DIVIDER)] });
 }
 
 registerCommands()

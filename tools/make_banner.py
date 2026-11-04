@@ -1,5 +1,5 @@
-"""Render the animated rules images:
-- assets/rules-banner.gif: green logo | "Rules" | red logo on a green->red gradient.
+"""Render the animated channel images:
+- assets/rules-banner.gif and assets/installation-banner.gif: green logo | title | red logo on a green->red gradient.
   The logos rush into the center, "eat" the text, merge into one, split back out, and the text pops back.
 - assets/rules-divider.gif: a long, thin strip of the gradient, scrolling in a seamless loop.
 
@@ -18,7 +18,6 @@ PAD = 50
 RADIUS = 48
 GREEN = (24, 150, 115)    # matches the green logo's background
 RED = (219, 13, 36)       # matches the red logo's background
-TEXT = "Rules"
 FPS = 25
 
 # Banner timeline, in seconds.
@@ -94,22 +93,22 @@ def logo_sprite(path):
     return sprite, m
 
 
-def text_sprite():
-    """'RULES' with outline and soft shadow, cropped to its own box."""
+def text_sprite(text):
+    """The title with outline and soft shadow, cropped to its own box."""
     space = W - 2 * (PAD + LOGO) - 120
     size = 220
     font = ImageFont.truetype("Hokjesgeest.otf", size)
-    while font.getbbox(TEXT)[2] - font.getbbox(TEXT)[0] > space:
+    while font.getbbox(text)[2] - font.getbbox(text)[0] > space:
         size -= 4
         font = ImageFont.truetype("Hokjesgeest.otf", size)
-    l, t, r, b = font.getbbox(TEXT, stroke_width=4)
+    l, t, r, b = font.getbbox(text, stroke_width=4)
     m = 40
     w, h = r - l + 2 * m, b - t + 2 * m
     sprite = Image.new("RGBA", (w, h), (0, 0, 0, 0))
     glow = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-    ImageDraw.Draw(glow).text((m - l + 6, m - t + 10), TEXT, font=font, fill=(0, 0, 0, 170), stroke_width=4)
+    ImageDraw.Draw(glow).text((m - l + 6, m - t + 10), text, font=font, fill=(0, 0, 0, 170), stroke_width=4)
     sprite = Image.alpha_composite(sprite, glow.filter(ImageFilter.GaussianBlur(10)))
-    ImageDraw.Draw(sprite).text((m - l, m - t), TEXT, font=font, fill="white", stroke_width=4, stroke_fill=(15, 15, 20))
+    ImageDraw.Draw(sprite).text((m - l, m - t), text, font=font, fill="white", stroke_width=4, stroke_fill=(15, 15, 20))
     return sprite
 
 
@@ -178,11 +177,11 @@ def place(frame, sprite, margin, x, y, scale=1.0, keep=None):
     frame.alpha_composite(sprite, pos)
 
 
-def banner():
+def banner(text, out):
     bg = gradient().convert("RGBA")
     green, gm = logo_sprite("assets/source/logo-green.jpg")
     red, rm = logo_sprite("assets/source/logo-red.jpg")
-    text = text_sprite()
+    title = text_sprite(text)
     y = (H - LOGO) // 2
 
     frames = []
@@ -190,8 +189,8 @@ def banner():
         xl, xr, s, pulse = banner_state(i / FPS)
         frame = bg.copy()
         if s > 0.01:
-            tw, th = max(1, round(text.width * s)), max(1, round(text.height * s))
-            scaled = text.resize((tw, th), Image.LANCZOS)
+            tw, th = max(1, round(title.width * s)), max(1, round(title.height * s))
+            scaled = title.resize((tw, th), Image.LANCZOS)
             frame.alpha_composite(scaled, ((W - tw) // 2, (H - th) // 2))
 
         scale = 1 + 0.12 * pulse
@@ -209,8 +208,8 @@ def banner():
         place(frame, green, gm, xl, y, scale, keep=("left", seam))
         frames.append(to_gif_frame(frame))
 
-    save_gif(frames, "assets/rules-banner.gif")
-    print("saved assets/rules-banner.gif", frames[0].size, len(frames), "frames")
+    save_gif(frames, out)
+    print("saved", out, frames[0].size, len(frames), "frames")
 
 
 # ---------- divider ----------
@@ -234,5 +233,6 @@ def divider(seconds=3.0):
 
 
 if __name__ == "__main__":
-    banner()
+    banner("Rules", "assets/rules-banner.gif")
+    banner("Installation", "assets/installation-banner.gif")
     divider()

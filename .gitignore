@@ -4,3 +4,7 @@ node_modules/
 
 # Font used only to render the banner (license not checked for redistribution)
 *.otf
+
+# Game builds are too big for git/Discord webhooks; host them elsewhere
+*.xapk
+*.apk
