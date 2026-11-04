@@ -1,5 +1,6 @@
 require('dotenv').config();
 const {
+  ChannelFlags,
   ChannelType,
   Client,
   Events,
@@ -14,12 +15,14 @@ const {
 const path = require('node:path');
 const { buildRulesEmbed } = require('./rules');
 const { buildInstallationEmbeds } = require('./installation');
+const { buildOfficialModsEmbeds, buildPublicModsEmbeds } = require('./mods');
 
 // Animated GIFs; regenerate with: python tools/make_banner.py
 const asset = (name) => ({ attachment: path.join(__dirname, '..', 'assets', name), name });
 const DIVIDER = 'rules-divider.gif';
 
 // What /webhook-1 can post. Each post is: banner GIF, then its embeds, then the gradient divider.
+// Posts with `forum` go into that forum channel as a new pinned post, wherever the command is run.
 const POSTS = {
   rules: {
     label: 'Rules',
@@ -33,11 +36,28 @@ const POSTS = {
     banner: 'installation-banner.gif',
     embeds: () => buildInstallationEmbeds(),
   },
+  officialMods: {
+    label: 'Official Mods',
+    webhookName: 'GeoPrix Official Mods',
+    banner: 'official-mods-banner.gif',
+    embeds: () => buildOfficialModsEmbeds(),
+    forum: '1567573407338332180', // #offical-mods
+    threadName: 'Read first: Official Mods',
+  },
+  publicMods: {
+    label: 'Public Mods',
+    webhookName: 'GeoPrix Public Mods',
+    banner: 'public-mods-banner.gif',
+    embeds: () => buildPublicModsEmbeds(),
+    forum: '1567573095898943599', // #public-mods
+    threadName: 'Read first: Public Mods',
+  },
 };
 
-// Channels that get a specific post automatically. Anything else gets the rules.
+// Channels that get a specific post automatically (also inside a forum's posts). Anything else gets the rules.
 const CHANNEL_POSTS = {
   [process.env.INSTALL_CHANNEL_ID || '1567573733063794948']: 'installation', // #moddable-download
+  ...Object.fromEntries(Object.entries(POSTS).filter(([, p]) => p.forum).map(([key, p]) => [p.forum, key])),
 };
 
 const { DISCORD_TOKEN, CLIENT_ID, GUILD_ID } = process.env;
@@ -50,7 +70,7 @@ const commands = [
   new SlashCommandBuilder().setName('ping').setDescription('Check if the bot is alive'),
   new SlashCommandBuilder()
     .setName('webhook-1')
-    .setDescription("Post this channel's info message (rules or installation) via a webhook")
+    .setDescription("Post this channel's info message (rules, installation, mod forums) via a webhook")
     .addStringOption((o) =>
       o
         .setName('post')
@@ -91,41 +111,78 @@ client.on(Events.InteractionCreate, async (interaction) => {
   if (interaction.commandName === 'webhook-1') {
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     try {
-      const key = interaction.options.getString('post') ?? CHANNEL_POSTS[interaction.channelId] ?? 'rules';
-      await postContent(interaction, POSTS[key]);
-      await interaction.editReply(`✅ ${POSTS[key].label} posted.`);
+      const key =
+        interaction.options.getString('post') ??
+        CHANNEL_POSTS[interaction.channelId] ??
+        CHANNEL_POSTS[interaction.channel?.parentId] ??
+        'rules';
+      const where = await postContent(interaction, POSTS[key]);
+      await interaction.editReply(`✅ ${POSTS[key].label} posted${where ? ` and pinned: ${where}` : '.'}`);
     } catch (err) {
       console.error('webhook-1 failed:', err);
       const msg =
         err.code === 50013
-          ? "❌ I'm missing the **Manage Webhooks** permission in this channel. Give my role that permission and try again."
+          ? "❌ I'm missing a permission there. My role needs **Manage Webhooks**, and **Manage Threads** for forum posts."
           : `❌ Couldn't post it: ${err.message}`;
       await interaction.editReply(msg);
     }
   }
 });
 
+async function getWebhook(channel, post, interaction) {
+  // Reuse our webhook if it already exists, so running the command again doesn't create duplicates.
+  const hooks = await channel.fetchWebhooks();
+  const existing = hooks.find((h) => h.owner?.id === client.user.id && h.name === post.webhookName);
+  return (
+    existing ??
+    channel.createWebhook({
+      name: post.webhookName,
+      avatar: client.user.displayAvatarURL(),
+      reason: `/webhook-1 used by ${interaction.user.tag}`,
+    })
+  );
+}
+
+// Returns a link to the new forum post, or nothing for normal channels.
 async function postContent(interaction, post) {
+  if (post.forum) return postToForum(interaction, post);
+
   const channel = interaction.channel;
   if (!channel || ![ChannelType.GuildText, ChannelType.GuildAnnouncement].includes(channel.type)) {
     throw new Error('use this in a normal text or announcement channel (not a thread, voice chat or forum).');
   }
-
-  // Reuse our webhook if it already exists, so running the command again doesn't create duplicates.
-  const hooks = await channel.fetchWebhooks();
-  let hook = hooks.find((h) => h.owner?.id === client.user.id && h.name === post.webhookName);
-  if (!hook) {
-    hook = await channel.createWebhook({
-      name: post.webhookName,
-      avatar: client.user.displayAvatarURL(),
-      reason: `/webhook-1 used by ${interaction.user.tag}`,
-    });
-  }
+  const hook = await getWebhook(channel, post, interaction);
 
   // Banner, then the embeds, then the gradient divider, as separate messages so they stay in that order.
   await hook.send({ files: [asset(post.banner)] });
   await hook.send({ embeds: post.embeds(), allowedMentions: { parse: [] } });
   await hook.send({ files: [asset(DIVIDER)] });
+}
+
+async function postToForum(interaction, post) {
+  const forum = await client.channels.fetch(post.forum);
+  if (forum?.type !== ChannelType.GuildForum) throw new Error(`channel ${post.forum} is not a forum.`);
+  const hook = await getWebhook(forum, post, interaction);
+
+  // The first message creates the forum post; the rest go into it.
+  const first = await hook.send({ threadName: post.threadName, files: [asset(post.banner)] });
+  const threadId = first.channelId;
+  await hook.send({ threadId, embeds: post.embeds(), allowedMentions: { parse: [] } });
+  await hook.send({ threadId, files: [asset(DIVIDER)] });
+
+  // A forum can only have one pinned post, so unpin our older info posts first.
+  const { threads } = await forum.threads.fetchActive();
+  for (const old of threads.values()) {
+    const ours = old.ownerId === hook.id || old.name === post.threadName;
+    if (old.id !== threadId && ours && old.flags.has(ChannelFlags.Pinned)) await old.unpin();
+  }
+  const thread = await client.channels.fetch(threadId);
+  try {
+    await thread.pin(`/webhook-1 used by ${interaction.user.tag}`);
+  } catch (err) {
+    throw new Error(`posted <#${threadId}>, but couldn't pin it (${err.message}). Unpin the other pinned post and pin it by hand.`);
+  }
+  return `<#${threadId}>`;
 }
 
 registerCommands()
