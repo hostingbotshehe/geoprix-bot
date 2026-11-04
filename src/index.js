@@ -16,9 +16,9 @@ const { buildRulesEmbed } = require('./rules');
 const path = require('node:path');
 
 const WEBHOOK_NAME = 'GeoPrix Rules';
-// Regenerate with: python tools/make_banner.py
-const RULES_BANNER = path.join(__dirname, '..', 'assets', 'rules-banner.png');
-const RULES_DIVIDER = path.join(__dirname, '..', 'assets', 'rules-divider.png');
+// Animated GIFs; regenerate with: python tools/make_banner.py
+const RULES_BANNER = path.join(__dirname, '..', 'assets', 'rules-banner.gif');
+const RULES_DIVIDER = path.join(__dirname, '..', 'assets', 'rules-divider.gif');
 
 const { DISCORD_TOKEN, CLIENT_ID, GUILD_ID } = process.env;
 if (!DISCORD_TOKEN || !CLIENT_ID) {
@@ -96,9 +96,9 @@ async function postRules(interaction) {
   }
 
   // Banner, then the rules, then the gradient divider, as separate messages so they stay in that order.
-  await hook.send({ files: [{ attachment: RULES_BANNER, name: 'rules-banner.png' }] });
+  await hook.send({ files: [{ attachment: RULES_BANNER, name: 'rules-banner.gif' }] });
   await hook.send({ embeds: [buildRulesEmbed()], allowedMentions: { parse: [] } });
-  await hook.send({ files: [{ attachment: RULES_DIVIDER, name: 'rules-divider.png' }] });
+  await hook.send({ files: [{ attachment: RULES_DIVIDER, name: 'rules-divider.gif' }] });
 }
 
 registerCommands()
