@@ -18,6 +18,7 @@ const path = require('node:path');
 const WEBHOOK_NAME = 'GeoPrix Rules';
 // Regenerate with: python tools/make_banner.py
 const RULES_BANNER = path.join(__dirname, '..', 'assets', 'rules-banner.png');
+const RULES_DIVIDER = path.join(__dirname, '..', 'assets', 'rules-divider.png');
 
 const { DISCORD_TOKEN, CLIENT_ID, GUILD_ID } = process.env;
 if (!DISCORD_TOKEN || !CLIENT_ID) {
@@ -94,9 +95,10 @@ async function postRules(interaction) {
     });
   }
 
-  // Banner first, then the rules, as two messages so the banner always sits on top.
+  // Banner, then the rules, then the gradient divider, as separate messages so they stay in that order.
   await hook.send({ files: [{ attachment: RULES_BANNER, name: 'rules-banner.png' }] });
   await hook.send({ embeds: [buildRulesEmbed()], allowedMentions: { parse: [] } });
+  await hook.send({ files: [{ attachment: RULES_DIVIDER, name: 'rules-divider.png' }] });
 }
 
 registerCommands()

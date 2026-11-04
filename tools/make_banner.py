@@ -1,4 +1,6 @@
-"""Render assets/rules-banner.png: green logo | "Rules" | red logo on a green->red gradient.
+"""Render the rules images:
+- assets/rules-banner.png: green logo | "Rules" | red logo on a green->red gradient
+- assets/rules-divider.png: a long, thin strip of just the gradient (posted after the rules)
 
 Usage: python tools/make_banner.py   (needs Pillow and Hokjesgeest.otf in the project root)
 """
@@ -13,18 +15,24 @@ RED = (219, 13, 36)      # matches the red logo's background
 TEXT = "Rules"
 
 
-def gradient():
-    img = Image.new("RGB", (W, H))
+def gradient(w=W, h=H):
+    img = Image.new("RGB", (w, h))
     px = img.load()
-    for x in range(W):
-        t = x / (W - 1)
+    for x in range(w):
+        t = x / (w - 1)
         t = t * t * (3 - 2 * t)  # smoothstep for a softer blend in the middle
         c = tuple(round(GREEN[i] + (RED[i] - GREEN[i]) * t) for i in range(3))
-        for y in range(H):
+        for y in range(h):
             px[x, y] = c
     # subtle vertical shading for depth
-    shade = Image.linear_gradient("L").resize((W, H)).point(lambda v: v * 0.35)
-    return Image.composite(Image.new("RGB", (W, H), (0, 0, 0)), img, shade)
+    shade = Image.linear_gradient("L").resize((w, h)).point(lambda v: v * 0.35)
+    return Image.composite(Image.new("RGB", (w, h), (0, 0, 0)), img, shade)
+
+
+def divider():
+    # Same width as the banner so both line up in Discord, but only 1/10 of the height.
+    gradient(W, 40).save("assets/rules-divider.png", optimize=True)
+    print("saved assets/rules-divider.png", (W, 40))
 
 
 def rounded(path):
@@ -76,3 +84,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    divider()
