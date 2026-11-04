@@ -13,7 +13,11 @@ const {
 } = require('discord.js');
 const { buildRulesEmbed } = require('./rules');
 
+const path = require('node:path');
+
 const WEBHOOK_NAME = 'GeoPrix Rules';
+// Regenerate with: python tools/make_banner.py
+const RULES_BANNER = path.join(__dirname, '..', 'assets', 'rules-banner.png');
 
 const { DISCORD_TOKEN, CLIENT_ID, GUILD_ID } = process.env;
 if (!DISCORD_TOKEN || !CLIENT_ID) {
@@ -90,6 +94,8 @@ async function postRules(interaction) {
     });
   }
 
+  // Banner first, then the rules, as two messages so the banner always sits on top.
+  await hook.send({ files: [{ attachment: RULES_BANNER, name: 'rules-banner.png' }] });
   await hook.send({ embeds: [buildRulesEmbed()], allowedMentions: { parse: [] } });
 }
 
