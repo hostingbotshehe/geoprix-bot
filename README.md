@@ -1,6 +1,6 @@
 # GeoPrix Bot
 
-A simple Discord bot with one slash command: `/ping`.
+A simple Discord bot with `/ping` and a `/webhook-1` command that posts the server rules.
 
 ## Setup
 
@@ -26,3 +26,6 @@ A simple Discord bot with one slash command: `/ping`.
 | Command | What it does |
 |---------|--------------|
 | `/ping` | Replies "Pong!" with round-trip and WebSocket latency |
+| `/webhook-1` | Posts the server rules in the current channel through a "GeoPrix Rules" webhook. Only members with **Manage Server** can use it. The bot needs **Manage Webhooks** in that channel. |
+
+To change the rules text, edit [src/rules.js](src/rules.js).
