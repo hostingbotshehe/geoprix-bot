@@ -30,6 +30,6 @@ A simple Discord bot with `/ping` and a `/webhook-1` command that posts the serv
 
 Each post is three messages: an animated banner ([rules](assets/rules-banner.gif) / [installation](assets/installation-banner.gif)), the embeds, then the gradient strip [assets/rules-divider.gif](assets/rules-divider.gif).
 
-The XAPK is too big to post through the bot (46 MB vs Discord's 10 MB webhook limit on unboosted servers), so the guide either links to `XAPK_URL` or tells people to download the file posted in the channel. XAPKs are git-ignored.
+The XAPK is too big to post through the bot (46 MB vs Discord's 10 MB webhook limit on unboosted servers), so the SAI install guide either links to `XAPK_URL` or tells people to download the file posted in the channel. XAPKs are git-ignored.
 
 To change the text, edit [src/rules.js](src/rules.js) or [src/installation.js](src/installation.js) (also update `BUILD` there for a new version). To change the banner, edit [tools/make_banner.py](tools/make_banner.py) and run `python tools/make_banner.py` (needs Pillow and `Hokjesgeest.otf` in the project folder; the font isn't committed).
