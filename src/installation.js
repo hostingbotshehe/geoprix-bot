@@ -43,7 +43,7 @@ function buildInstallationEmbeds() {
       '- Only download from this server. Re-uploads can contain malware.\n' +
         '- Uninstalling the original app can delete progress that isn\'t backed up.\n' +
         '- No automatic updates. New builds are posted here.\n' +
-        '- Modified clients may break the game\'s terms of service and can get your account banned.',
+        '- Modified apps may break the game\'s terms of service.',
     );
 
   const legal = new EmbedBuilder()
@@ -55,7 +55,7 @@ function buildInstallationEmbeds() {
         'It may only be used for ethical mods, such as adding new features. Bypassing GeoPrix Pro, ads or other ' +
         'paid content, cheating, or harming other players is not allowed.\n\n' +
         'Provided as is, without warranty. You use it at your own risk; we are not responsible for data loss or ' +
-        'account action. Do not re-upload or sell this build. Rights holders with concerns can contact staff.',
+        'damage. Do not re-upload or sell this build. Rights holders with concerns can contact staff.',
     );
 
   return [guide, risks, legal];

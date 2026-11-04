@@ -52,8 +52,8 @@ function buildPublicModsEmbeds() {
     .setDescription(
       'Anyone can upload mods here. This forum is only partially moderated and mods are not reviewed by staff, ' +
         'so installing them is **not recommended**. Use Official Mods when you can.\n\n' +
-        'A mod runs code inside GeoPrix. A bad one can crash the game, wipe your progress or get your account ' +
-        'banned. Only install mods from people you trust, and report harmful ones to staff.\n\n' +
+        'A mod runs code inside GeoPrix. A bad one can crash the game, wipe your progress or harm your device. ' +
+        'Only install mods from people you trust, and report harmful ones to staff.\n\n' +
         INSTALL_STEPS,
     );
 
