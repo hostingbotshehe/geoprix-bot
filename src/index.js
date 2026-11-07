@@ -18,6 +18,7 @@ const path = require('node:path');
 const { buildRulesEmbed } = require('./rules');
 const { buildInstallationEmbeds } = require('./installation');
 const { buildOfficialModsEmbeds, buildPublicModsEmbeds } = require('./mods');
+const { buildLinksButtons, buildLinksEmbeds } = require('./links');
 
 // Animated GIFs; regenerate with: python tools/make_banner.py
 const asset = (name) => ({ attachment: path.join(__dirname, '..', 'assets', name), name });
@@ -54,11 +55,19 @@ const POSTS = {
     forum: '1567573095898943599', // #public-mods
     threadName: 'Read first: Public Mods',
   },
+  links: {
+    label: 'Links',
+    webhookName: 'GeoPrix Links',
+    banner: 'links-banner.gif',
+    embeds: () => buildLinksEmbeds(),
+    components: () => buildLinksButtons(),
+  },
 };
 
 // Channels that get a specific post automatically (also inside a forum's posts). Anything else gets the rules.
 const CHANNEL_POSTS = {
   [process.env.INSTALL_CHANNEL_ID || '1567573733063794948']: 'installation', // #moddable-download
+  '1568622703609511987': 'links', // #links
   ...Object.fromEntries(Object.entries(POSTS).filter(([, p]) => p.forum).map(([key, p]) => [p.forum, key])),
 };
 
@@ -192,8 +201,20 @@ async function postContent(interaction, post) {
 
   // Banner, then the embeds, then the gradient divider, as separate messages so they stay in that order.
   await hook.send({ files: [asset(post.banner)] });
-  await hook.send({ embeds: post.embeds(), allowedMentions: { parse: [] } });
+  await sendEmbeds(hook, post);
   await hook.send({ files: [asset(DIVIDER)] });
+}
+
+// Embeds plus optional link buttons. If Discord refuses the buttons, the embeds still go out without them.
+async function sendEmbeds(hook, post, extra = {}) {
+  const base = { ...extra, embeds: post.embeds(), allowedMentions: { parse: [] } };
+  if (!post.components) return hook.send(base);
+  try {
+    return await hook.send({ ...base, components: post.components(), withComponents: true });
+  } catch (err) {
+    console.warn(`Link buttons refused for ${post.label} (${err.message}); sending without them.`);
+    return hook.send(base);
+  }
 }
 
 async function postToForum(interaction, post) {
@@ -204,7 +225,7 @@ async function postToForum(interaction, post) {
   // The first message creates the forum post; the rest go into it.
   const first = await hook.send({ threadName: post.threadName, files: [asset(post.banner)] });
   const threadId = first.channelId;
-  await hook.send({ threadId, embeds: post.embeds(), allowedMentions: { parse: [] } });
+  await sendEmbeds(hook, post, { threadId });
   await hook.send({ threadId, files: [asset(DIVIDER)] });
 
   // A forum can only have one pinned post, so unpin our older info posts first.

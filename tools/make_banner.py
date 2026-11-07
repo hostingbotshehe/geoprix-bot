@@ -1,5 +1,5 @@
 """Render the animated channel images:
-- assets/{rules,installation,official-mods,public-mods}-banner.gif: green logo | title | red logo on a green->red gradient.
+- assets/{rules,installation,official-mods,public-mods,links}-banner.gif: green logo | title | red logo on a green->red gradient.
   The logos rush into the center, "eat" the text, merge into one, split back out, and the text pops back.
 - assets/rules-divider.gif: a long, thin strip of the gradient, scrolling in a seamless loop.
 
@@ -237,4 +237,5 @@ if __name__ == "__main__":
     banner("Installation", "assets/installation-banner.gif")
     banner("Official Mods", "assets/official-mods-banner.gif")
     banner("Public Mods", "assets/public-mods-banner.gif")
+    banner("Links", "assets/links-banner.gif")
     divider()
